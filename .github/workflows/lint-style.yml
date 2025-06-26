@@ -1,0 +1,26 @@
+name: .NET Lint and Style Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Run Roslyn Analyzers
+      run: dotnet build -warnaserror
+    - name: Run StyleCop Analyzers
+      run: |
+        dotnet new tool-manifest
+        dotnet tool install dotnet-format
+        dotnet format --verify-no-changes

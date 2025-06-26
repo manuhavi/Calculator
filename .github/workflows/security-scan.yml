@@ -1,0 +1,27 @@
+name: .NET Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Run dotnet security audit
+      run: dotnet list package --vulnerable
+    - name: Run GitHub CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3

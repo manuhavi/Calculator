@@ -1,0 +1,27 @@
+name: .NET Release Packaging
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release-package:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build (Release)
+      run: dotnet build --configuration Release --no-restore
+    - name: Pack NuGet Package
+      run: dotnet pack --configuration Release --no-build -o ./nupkgs
+    - name: Upload NuGet Package Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NuGetPackages
+        path: ./nupkgs

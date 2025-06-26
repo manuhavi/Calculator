@@ -1,0 +1,72 @@
+name: .NET Build and Test (Release)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Set up JDK 17 for SonarCloud
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Cache SonarCloud packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+        restore-keys: ${{ runner.os }}-sonar
+    - name: Install SonarCloud scanner
+      run: |
+        dotnet tool install --global dotnet-sonarscanner
+    - name: Begin SonarCloud analysis
+      run: |
+        dotnet sonarscanner begin /k:"manuhavi_Calculator" /o:"manuhavi" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io"
+    - name: Build (Release)
+      run: dotnet build --configuration Release --no-restore
+    - name: Test with coverage (Release)
+      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+    - name: End SonarCloud analysis
+      run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    - name: Generate coverage report (Release)
+      uses: danielpalme/ReportGenerator-GitHub-Action@5.2.0
+      with:
+        reports: '**/TestResults/**/coverage.cobertura.xml'
+        targetdir: 'coveragereport-release'
+        reporttypes: 'HtmlInline;Cobertura'
+    - name: Upload coverage report (Release)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CoverageReport-Release
+        path: coveragereport-release
+    - name: Code Coverage Summary Report (Release)
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      with:
+        filename: '**/TestResults/**/coverage.cobertura.xml'
+        badge: true
+        format: 'markdown'
+        output: 'both'
+    - name: Add Coverage PR Comment (Release)
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        recreate: true
+        path: code-coverage-results.md
