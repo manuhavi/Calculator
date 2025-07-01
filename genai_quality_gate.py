@@ -2,12 +2,30 @@ import os
 import sys
 import requests
 import json
+import xml.etree.ElementTree as ET
 
-def build_prompt(metrics):
+def parse_cobertura_issues(xml_path):
+    issues = []
+    if not os.path.exists(xml_path):
+        return issues
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+    for cls in root.findall('.//class'):
+        filename = cls.attrib.get('filename')
+        for line in cls.findall('lines/line'):
+            if line.attrib.get('hits') == '0':
+                issues.append(f"{filename}:{line.attrib.get('number')}: Not covered by tests.")
+    return issues
+
+def build_prompt(metrics, code_smells):
+    code_smell_list = '\n'.join(code_smells) if code_smells else 'None.'
     return (
-        "You are an AI code reviewer. Given the following code metrics and changes, "
-        "should this PR pass the quality gate? Respond with 'PASS' or 'FAIL' and explain your reasoning.\n"
-        f"Coverage: {metrics.get('coverage', 'N/A')}\nCode Smells: {metrics.get('smells', 'N/A')}\nBugs: {metrics.get('bugs', 'N/A')}\nVulnerabilities: {metrics.get('vulns', 'N/A')}\nDiff: {metrics.get('diff', 'N/A')}\n"
+        "You are an AI code reviewer. Given the following code metrics and issues, "
+        "should this PR pass the quality gate? Respond with 'PASS' or 'FAIL' and explain your reasoning. "
+        "If you fail, reference the exact file and line numbers in your explanation.\n"
+        f"Coverage: {metrics.get('coverage', 'N/A')}\n"
+        f"Code Smells:\n{code_smell_list}\n"
+        f"Diff: {metrics.get('diff', 'N/A')}\n"
     )
 
 def call_gemini(prompt):
@@ -23,15 +41,14 @@ def call_gemini(prompt):
     return resp.json()
 
 def main():
-    # Example: you can parse real metrics here
+    # Example: parse code smells from coverage (or replace with SonarCloud/linter output)
+    cobertura_path = os.getenv('COVERAGE_FILE', 'Calculator.Tests/TestResults/coverage.cobertura.xml')
+    code_smells = parse_cobertura_issues(cobertura_path)
     metrics = {
         'coverage': '80%',
-        'smells': 2,
-        'bugs': 0,
-        'vulns': 0,
         'diff': 'Minor refactor.'
     }
-    prompt = build_prompt(metrics)
+    prompt = build_prompt(metrics, code_smells)
     print(f"Prompt to Gemini:\n{prompt}\n")
     response = call_gemini(prompt)
     print(f"Gemini raw response:\n{json.dumps(response, indent=2)}\n")
