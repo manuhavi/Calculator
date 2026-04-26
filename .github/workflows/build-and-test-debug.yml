@@ -1,6 +1,7 @@
 name: .NET Build and Test (Debug)
 
 on:
+#this is push trigger
   push:
     branches: [ "main" ]
   pull_request:
